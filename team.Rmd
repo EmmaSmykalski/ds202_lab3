@@ -1,0 +1,136 @@
+---
+title: "DS 202 Lab 3"
+author: "Emma Smykalski"
+date: "3/5/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r, echo=FALSE, cache=FALSE, results=FALSE, warning=FALSE, comment=FALSE, warning=FALSE}
+dat <- readxl::read_xls("C:/Users/esmyk/OneDrive/DS 202/GSS.xls")
+library(tidyverse)
+library(ggplot2)
+require(dplyr)
+```
+```{r, warnings=FALSE}
+dat1 <- dat %>%
+  rename(
+    year = `Gss year for this respondent`,
+    hap = `General happiness`,
+    attend = `How often r attends religious services`,
+    polparty = `Political party affiliation`,
+    fammoney = `How many in family earned money`,
+    sex = `Respondents sex`,
+    school = `Highest year of school completed`,
+    children = `Number of children`,
+    marriage = `Marital status`,
+    id = `Respondent id number`,
+    ballot = `Ballot used for interview`
+    )
+```
+```{r, warnings=FALSE}
+dat1$school <- as.integer(dat1$school)
+
+dat1 <- dat1 %>% drop_na()
+```
+
+## Exploration  
+### 1)  
+It looks like those who are never married and divorced have the highest average years of school. Never married makes sense being the group with the highest average school because I think a lot of people don't get married if they are very focused on school and their career. 
+```{r}
+edu <- dat1 %>% filter(marriage != 'No answer') %>%
+  group_by(marriage) %>%
+  summarize(aveschool = mean(school)) %>%
+  arrange(desc(aveschool))
+edu
+```
+
+### 2)  
+```{r}
+betteredu <- dat1 %>%
+  group_by(marriage) %>%
+  filter(school > mean(school))
+str(betteredu)
+```
+
+### 3)  
+In order to see how marriage status and happiness are related I created a new column (IsHappy) which assigned "Happy" to people who said they were either "very happy" or "pretty happy" and assigned "Other" to the rest of the respondents. From here I took the total number of "Happy" people in each marital group and divided by the total number of people in that group to make my variable "happyrate." From my arranged output of dat7, I found that married people had the highest rate of happiness and separated people had the lowest rate. My plot further emphasizes this. 
+```{r}
+dat5 <- dat1 %>% 
+  mutate(IsHappy = ifelse(hap == 'Pretty happy' | 
+                            hap == 'Very happy',
+                          'Happy',
+                          'Other'))
+
+dat6 <- dat5 %>% group_by(marriage) %>% 
+  summarize(n = n(), sumofhappy = sum(IsHappy == 'Happy'))
+
+dat7 <- dat6 %>% filter(marriage != 'No answer') %>%
+  mutate(happyrate = sumofhappy/n) %>%
+  arrange(desc(happyrate))
+dat7
+```
+```{r}
+ggplot(dat7, aes(x=reorder(marriage, happyrate),weight = happyrate)) + geom_bar() + ylab('Rate of happiness in group') + xlab('Marital Status')
+```
+
+### 4)  
+I found that party affiliation does affect the relationship between marriage and happiness. From my faceted plot you can see that the political parties that had the most amount of happy people were not strong democrats and not strong republicans. In the plot for each of these two parties you can see that the marital status that had the most happy people were those who were married. This shows that there is a large amount of not strong democrats and not strong republics who are married and are happy. I also defined a rate of happiness variable (rateofhappy) to summarize the rate of happy people in each combination of political party and marriage status. I arranged those rates and found that the top four happiest combinations of political party and marriage status are (married,not strong republican), (married, independent near republican), (married, not strong democrat), and (married, strong republican.) (I ignored the "Don't know" political party)
+```{r}
+ggplot(dat5, aes(x=marriage, weight = mean(IsHappy=='Happy'))) + geom_bar() + facet_wrap(~polparty) + coord_flip() +xlab('Marital status')+ ylab('Number of happy people')
+```
+```{r}
+dat13 <- dat5 %>% filter(marriage != 'No answer') %>%
+  group_by(marriage, polparty) %>% 
+  summarize(frequency = n(), rateofhappy = sum(IsHappy == 'Happy')/frequency) %>% 
+  arrange(desc(rateofhappy))
+dat13
+```
+
+### 5)  
+I didn't find much of a relationship between marital status and education. When I found the mean years of schooling in each marital status group I found that they were all fairly similar. I made a boxplot to visually represent this and you can see that their medians all lie between around 11 and 14 (disregarding the "no answer" group.)
+```{r}
+eduvsmar <- dat1 %>% filter(marriage != 'No answer') %>%
+  group_by(marriage) %>% 
+  summarize(meanedu = mean(school))
+eduvsmar
+```
+```{r}
+ggplot(dat1, aes(x=marriage, y=school)) + geom_boxplot() + ylab('Years of School') + xlab('Marital Status')
+
+```
+
+### 6)  
+The two other questions that I wanted to explore were how the number of children and martial status effect the happiness of someone and also how the frequency of which someone goes to church is related to the level of education of that individual. 
+First lets look at how children and marital status effect happiness:  
+I made a side-by-side histogram of the number of happy people (from IsHappy) based off of the number of children and the marital status. I found that the group that had the highest number of happy people were those who were married and had two kids. The group that had the second highest number of happy people were never married individuals with no kids. It looks like seperated people with any amount of kids had the lowest number of happy people.  
+```{r}
+dat9 <- dat5 %>% filter(attend != 'Dk,na', marriage != 'No answer', IsHappy == 'Happy')
+dat9$children <- as.numeric(dat9$children)
+ggplot(dat9, aes(x=children, fill=marriage)) + geom_histogram(binwidth = 1/2, position = 'dodge') + xlab('Number of Children') + ylab('Number of happy people')
+```  
+
+For my numerical summary of this I just looked at how the number of children effect happiness by finding the rate of happy people per each group of number of children. I found that the happiest people have 2 or 0 kids. 
+```{r}
+dat11 <- dat5 %>% filter(children != 'Dk na') %>% group_by(children) %>% 
+  summarize(n=n(), sumofhappy = sum(IsHappy == 'Happy'), happyrate = sumofhappy/n) %>%
+  arrange(desc(happyrate))
+dat11
+```
+
+Now let's look at how the frequency of which someone goes to church is related to the level of education of that individual:  
+I found that there is not much of a relationship between these two factors, the average school for each frequency of going to church is between 12.5 and 13. The group with the lowest average years of schooling is those who attend church more than once a week. 
+```{r}
+dat12 <- dat1 %>% select(attend,school) %>% filter(attend != 'Dk,na') %>%
+  group_by(attend) %>% 
+  summarize(averageschool = mean(school)) %>%
+  arrange(desc(averageschool))
+dat12 
+```
+
+I also made a boxplot of the years of schooling for each group and you can see how there is not much of a relationship in this visual representation. 
+```{r}
+ggplot(dat1, aes(x=attend, y=school)) + geom_boxplot() + ylab('Years of School') + xlab('How often people attend church') + coord_flip()
+```
